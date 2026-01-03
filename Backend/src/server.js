@@ -2,12 +2,21 @@ import express from "express";
 import dotenv from "dotenv";
 import connectdb from "./lib/db.js";
 import path from "path";
+import cors from "cors";
 
 dotenv.config({ quiet: true });
 
 const app = express();
+app.use(express.json());
 
 const __dirname = path.resolve();
+
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL,
+    credentials: true,
+  }),
+);
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
