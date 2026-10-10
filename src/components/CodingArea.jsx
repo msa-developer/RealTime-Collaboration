@@ -87,7 +87,7 @@ const CodingArea = ({ setUsers }) => {
   const [codeValue, setCodeValue] = useState("");
   const EditorRef = useRef();
   const { id: roomId } = useParams();
-  const username = getUsername();
+  const [username, setUsername] = useState("Anonymous");
   const toast = useToast();
   const nav = useRouter();
   const typingTimeoutRef = useRef(null);
@@ -98,6 +98,10 @@ const CodingArea = ({ setUsers }) => {
   const [running, setRunning] = useState(false);
   const runningRef = useRef(false);
   const [output, setOutput] = useState(null);
+
+  useEffect(() => {
+    setUsername(getUsername());
+  }, []);
 
   useEffect(() => {
     socket.emit("joinRoom", { roomId, username });

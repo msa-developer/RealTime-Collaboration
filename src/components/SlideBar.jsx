@@ -14,6 +14,7 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import socket from "../services/socket";
 import { getUsername } from "../services/username";
 
@@ -21,8 +22,13 @@ const SlideBar = ({ data }) => {
   const { colorMode, toggleColorMode } = useColorMode();
   const nav = useRouter();
   const { id: roomId } = useParams();
-  const username = getUsername();
+  const [username, setUsername] = useState("Anonymous");
   const toast = useToast();
+  const headingColor = useColorModeValue("green.600", "black");
+
+  useEffect(() => {
+    setUsername(getUsername());
+  }, []);
 
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId);
@@ -42,11 +48,7 @@ const SlideBar = ({ data }) => {
     <Box p={"6"} minH={"100vh"} bg={"cyan"}>
       <Flex direction={"column"} h="95vh">
         <HStack mb={"4"} justifyContent={"space-between"}>
-          <Heading
-            as="h3"
-            color={useColorModeValue("green.600", "black")}
-            size="lg"
-          >
+          <Heading as="h3" color={headingColor} size="lg">
             Connected ({data.length})
           </Heading>
           <Button colorScheme="blue" onClick={toggleColorMode}>
@@ -57,10 +59,7 @@ const SlideBar = ({ data }) => {
           {data.map((user) => (
             <HStack key={user.socketId} spacing={"3.5"}>
               <Avatar name={user.username} />
-              <Text
-                color={useColorModeValue("green.600", "black")}
-                fontSize="sm"
-              >
+              <Text color={headingColor} fontSize="sm">
                 {user.username}
               </Text>
             </HStack>
