@@ -1,8 +1,78 @@
-import { Box, useToast } from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Select, Text, useToast } from "@chakra-ui/react";
 import { Editor } from "@monaco-editor/react";
 import { useRef, useState, useEffect } from "react";
-import { useParams, useLocation } from "react-router";
+import { useNavigate, useParams, useLocation } from "react-router";
 import socket from "../services/socket";
+import { ArrowLeftIcon, PlayIcon } from "./icons";
+
+const LANGUAGES = [
+  { id: "javascript", label: "JavaScript", monaco: "javascript" },
+  { id: "python", label: "Python", monaco: "python" },
+  { id: "java", label: "Java", monaco: "java" },
+  { id: "cpp", label: "C++", monaco: "cpp" },
+];
+
+/* Monaco ships rich IntelliSense only for JS/TS/JSON/CSS/HTML.
+   Python/Java/C++ get colorization only — these providers fill the gap. */
+const COMPLETIONS = {
+  python: {
+    keywords: [
+      "def", "class", "if", "elif", "else", "for", "while", "return",
+      "import", "from", "as", "with", "try", "except", "finally", "raise",
+      "pass", "break", "continue", "lambda", "in", "is", "and", "or", "not",
+      "True", "False", "None", "self", "global", "yield", "assert", "del",
+      "print", "input", "range", "len", "str", "int", "float", "list",
+      "dict", "set", "tuple", "open",
+    ],
+    snippets: [
+      ["def", "def ${1:name}(${2:args}):\n\t${0}"],
+      ["class", "class ${1:Name}:\n\tdef __init__(self${2:, args}):\n\t\t${0}"],
+      ["for", "for ${1:item} in ${2:iterable}:\n\t${0}"],
+      ["while", "while ${1:condition}:\n\t${0}"],
+      ["ifmain", 'if __name__ == "__main__":\n\t${0}'],
+      ["try", "try:\n\t${1}\nexcept ${2:Exception} as e:\n\t${0}"],
+      ["main", 'print(${1})${0}'],
+    ],
+  },
+  java: {
+    keywords: [
+      "public", "private", "protected", "static", "void", "class",
+      "interface", "extends", "implements", "new", "return", "if", "else",
+      "for", "while", "do", "switch", "case", "break", "continue", "try",
+      "catch", "finally", "throw", "throws", "this", "super", "import",
+      "package", "int", "double", "float", "boolean", "char", "String",
+      "long", "short", "byte", "abstract", "final", "enum", "instanceof",
+      "null", "true", "false", "System.out.println",
+    ],
+    snippets: [
+      ["main", "public static void main(String[] args) {\n\t${0}\n}"],
+      ["class", "public class ${1:Name} {\n\t${0}\n}"],
+      ["for", "for (int ${1:i} = 0; ${1:i} < ${2:n}; ${1:i}++) {\n\t${0}\n}"],
+      ["if", "if (${1:condition}) {\n\t${0}\n}"],
+      ["sout", "System.out.println(${1});${0}"],
+      ["psvm", "public static void main(String[] args) {\n\t${0}\n}"],
+    ],
+  },
+  cpp: {
+    keywords: [
+      "#include <iostream>", "using namespace std;", "int", "double",
+      "float", "char", "bool", "void", "long", "auto", "const", "class",
+      "struct", "public", "private", "protected", "template", "typename",
+      "return", "if", "else", "for", "while", "do", "switch", "case",
+      "break", "continue", "try", "catch", "throw", "new", "delete",
+      "nullptr", "true", "false", "std::", "vector", "string", "cout",
+      "cin", "endl", "printf", "size_t",
+    ],
+    snippets: [
+      ["main", "#include <iostream>\n\nint main() {\n\t${0}\n\treturn 0;\n}"],
+      ["for", "for (${1:int i = 0}; ${1:i} < ${2:n}; ${1:i}++) {\n\t${0}\n}"],
+      ["while", "while (${1:condition}) {\n\t${0}\n}"],
+      ["cout", "cout << ${1} << endl;${0}"],
+      ["cin", "cin >> ${1};${0}"],
+      ["vec", "std::vector<${1:int}> ${2:v};${0}"],
+    ],
+  },
+};
 
 const CodingArea = ({ setUsers }) => {
   const [codeValue, setCodeValue] = useState("");
@@ -11,10 +81,15 @@ const CodingArea = ({ setUsers }) => {
   const location = useLocation();
   const username = location.state?.username || "Anonymous";
   const toast = useToast();
+  const nav = useNavigate();
   const typingTimeoutRef = useRef(null);
   const [typingToastId, setTypingToastId] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [currentlyTypingUser, setCurrentlyTypingUser] = useState(null);
+  const [language, setLanguage] = useState("javascript");
+  const [running, setRunning] = useState(false);
+  const runningRef = useRef(false);
+  const [output, setOutput] = useState(null);
 
   useEffect(() => {
     socket.emit("joinRoom", { roomId, username });
@@ -101,24 +176,355 @@ const CodingArea = ({ setUsers }) => {
     }, 500);
   };
 
-  const OnMount = (editor) => {
+  const runCode = async () => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    setRunning(true);
+    setOutput(null);
+    try {
+      const res = await fetch("/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language, code: codeValue }),
+      });
+      const data = await res.json();
+      setOutput(
+        res.ok
+          ? data
+          : { stdout: "", stderr: data.error || "Run failed.", code: 1 },
+      );
+    } catch {
+      setOutput({
+        stdout: "",
+        stderr: "Cannot reach the run service. Is the backend running?",
+        code: 1,
+      });
+    } finally {
+      runningRef.current = false;
+      setRunning(false);
+    }
+  };
+  const runRef = useRef(runCode);
+  runRef.current = runCode;
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        runRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const OnMount = (editor, monaco) => {
     EditorRef.current = editor;
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      () => runRef.current(),
+    );
+
+    Object.entries(COMPLETIONS).forEach(([lang, { keywords, snippets }]) => {
+      monaco.languages.registerCompletionItemProvider(lang, {
+        triggerCharacters: [".", "_", ":", ">", "#"],
+        provideCompletionItems: (model, position) => {
+          const word = model.getWordUntilPosition(position);
+          const range = new monaco.Range(
+            position.lineNumber,
+            word.startColumn,
+            position.lineNumber,
+            word.endColumn,
+          );
+          return {
+            suggestions: [
+              ...keywords.map((k) => ({
+                label: k,
+                kind: monaco.languages.CompletionItemKind.Keyword,
+                range,
+                insertText: k,
+              })),
+              ...snippets.map(([label, insertText]) => ({
+                label,
+                kind: monaco.languages.CompletionItemKind.Snippet,
+                range,
+                insertText,
+                insertTextRules:
+                  monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              })),
+            ],
+          };
+        },
+      });
+    });
+
+    /* Geist code theme — white surface, ink foreground, accent syntax */
+    monaco.editor.defineTheme("geist", {
+      base: "vs",
+      inherit: true,
+      rules: [
+        { token: "keyword", foreground: "7928ca" },
+        { token: "string", foreground: "0070f3" },
+        { token: "comment", foreground: "8f8f8f" },
+        { token: "number", foreground: "eb367f" },
+        { token: "type", foreground: "171717" },
+      ],
+      colors: {
+        "editor.background": "#ffffff",
+        "editor.foreground": "#171717",
+        "editor.lineHighlightBackground": "#fafafa",
+        "editorLineNumber.foreground": "#a1a1a1",
+        "editorLineNumber.activeForeground": "#171717",
+        "editorCursor.foreground": "#171717",
+        "editor.selectionBackground": "#d3e5ff",
+        "editor.inactiveSelectionBackground": "#d3e5ff",
+      },
+    });
+    monaco.editor.setTheme("geist");
+
     editor.focus();
   };
 
   return (
-    <Box minH={"full"} w={"full"} p={"6"}>
-      <Editor
-        height="90vh"
-        theme="vs-dark"
-        value={codeValue}
-        onChange={handleCodeChange}
-        defaultLanguage="javascript"
-        onMount={OnMount}
-      />
+    <Box
+      flex="1"
+      minW="0"
+      bg="canvas"
+      display="flex"
+      flexDirection="column"
+      minH="100vh"
+    >
+      {/* App chrome bar */}
+      <Flex
+        align="center"
+        justify="space-between"
+        gap="sm"
+        px={{ base: "md", lg: "lg" }}
+        py="md"
+        bg="elevated"
+        borderBottom="1px solid"
+        borderColor="hairline"
+      >
+        <HStack spacing="sm" minW="0">
+          <Box
+            as="button"
+            onClick={() => nav("/")}
+            title="Back to home"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            w="32px"
+            h="32px"
+            rounded="sm"
+            border="1px solid"
+            borderColor="hairline"
+            bg="elevated"
+            color="ink"
+            cursor="pointer"
+            _hover={{ borderColor: "#d4d4d4" }}
+            flexShrink={0}
+          >
+            <ArrowLeftIcon />
+          </Box>
+          <Text as="p" textStyle="monoEyebrow" color="mute" whiteSpace="nowrap">
+            Live Editor
+          </Text>
+          <Text
+            as="span"
+            fontFamily="mono"
+            fontSize="13px"
+            color="body"
+            noOfLines={1}
+            display={{ base: "none", sm: "inline" }}
+          >
+            {roomId.slice(0, 12)}…
+          </Text>
+        </HStack>
+
+        {currentlyTypingUser ? (
+          <HStack spacing="xs" flexShrink={0}>
+            <Box className="pulse-dot" w="2" h="2" rounded="full" bg="link" />
+            <Text as="p" textStyle="bodySm" color="body" whiteSpace="nowrap">
+              {currentlyTypingUser} typing…
+            </Text>
+          </HStack>
+        ) : (
+          <HStack spacing="xs" flexShrink={0}>
+            <Box w="2" h="2" rounded="full" bg="link" />
+            <Text as="p" textStyle="bodySm" color="faint" whiteSpace="nowrap">
+              Synced
+            </Text>
+          </HStack>
+        )}
+      </Flex>
+
+      {/* Editor card — toolbar, code surface, output console */}
+      <Box flex="1" p={{ base: "md", lg: "lg" }} minH="0" display="flex">
+        <Box
+          flex="1"
+          minH="0"
+          bg="elevated"
+          border="1px solid"
+          borderColor="hairline"
+          rounded="md"
+          overflow="hidden"
+          display="flex"
+          flexDirection="column"
+        >
+          {/* Toolbar — language picker + Run */}
+          <Flex
+            align="center"
+            justify="space-between"
+            gap="sm"
+            px="md"
+            py="xs"
+            borderBottom="1px solid"
+            borderColor="hairline"
+            flexShrink={0}
+          >
+            <HStack spacing="sm" minW="0">
+              <Select
+                aria-label="Programming language"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                size="sm"
+                w="auto"
+                fontFamily="mono"
+                fontSize="13px"
+                bg="elevated"
+                color="ink"
+                border="1px solid"
+                borderColor="hairline"
+                rounded="sm"
+                _hover={{ borderColor: "#d4d4d4" }}
+                _focus={{ borderColor: "link", boxShadow: "0 0 0 3px #d3e5ff", outline: "none" }}
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.label}
+                  </option>
+                ))}
+              </Select>
+              <Text
+                as="p"
+                textStyle="monoEyebrow"
+                color="faint"
+                display={{ base: "none", md: "block" }}
+              >
+                Ctrl + Enter to run
+              </Text>
+            </HStack>
+            <Button
+              variant="primarySm"
+              size="sm"
+              leftIcon={<PlayIcon />}
+              isLoading={running}
+              onClick={runCode}
+            >
+              Run
+            </Button>
+          </Flex>
+
+          {/* Code surface */}
+          <Box flex="1" minH="0">
+            <Editor
+              height="100%"
+              theme="geist"
+              value={codeValue}
+              onChange={handleCodeChange}
+              language={LANGUAGES.find((l) => l.id === language)?.monaco}
+              onMount={OnMount}
+              options={{
+                minimap: { enabled: false },
+                fontFamily: "'Geist Mono', ui-monospace, monospace",
+                fontSize: 14,
+                lineHeight: 22,
+                padding: { top: 16 },
+                scrollBeyondLastLine: false,
+                renderLineHighlight: "line",
+                automaticLayout: true,
+                smoothScrolling: true,
+                cursorBlinking: "smooth",
+                tabSize: 2,
+              }}
+            />
+          </Box>
+
+          {/* Output console */}
+          <Box
+            flexShrink={0}
+            h={{ base: "150px", md: "200px" }}
+            bg="canvas"
+            borderTop="1px solid"
+            borderColor="hairline"
+            display="flex"
+            flexDirection="column"
+            minH="0"
+          >
+            <Flex
+              align="center"
+              justify="space-between"
+              px="md"
+              py="xxs"
+              borderBottom="1px solid"
+              borderColor="hairline"
+              flexShrink={0}
+            >
+              <Text as="p" textStyle="monoEyebrow" color="mute">
+                Output
+              </Text>
+              <Text
+                as="p"
+                textStyle="monoEyebrow"
+                color={
+                  running
+                    ? "link"
+                    : output?.timedOut
+                      ? "warningDeep"
+                      : output
+                        ? output.code === 0
+                          ? "link"
+                          : "error"
+                        : "faint"
+                }
+              >
+                {running
+                  ? "Running…"
+                  : output?.timedOut
+                    ? "Time limit"
+                    : output
+                      ? `Exit ${output.code}`
+                      : "Idle"}
+              </Text>
+            </Flex>
+            <Box flex="1" overflowY="auto" minH="0" px="md" py="sm">
+              {output || running ? (
+                <Box
+                  as="pre"
+                  textStyle="code"
+                  fontSize="13px"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                  m="0"
+                >
+                  {output?.stdout}
+                  {output?.stderr && (
+                    <Box as="span" color="error" display="block">
+                      {output.stderr}
+                    </Box>
+                  )}
+                </Box>
+              ) : (
+                <Text as="p" textStyle="code" fontSize="13px" color="faint">
+                  Output appears here. Press Ctrl + Enter to run.
+                </Text>
+              )}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
     </Box>
   );
 };
 
 export default CodingArea;
-
