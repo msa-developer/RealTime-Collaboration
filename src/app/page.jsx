@@ -1,30 +1,51 @@
 "use client";
 
-import { Box, Button, HStack, Input, useToast, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Input,
+  Link,
+  Text,
+  useToast,
+  VStack,
+} from "@chakra-ui/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const FEATURES = [
+  {
+    title: "Live sync",
+    body: "Every keystroke propagates to the room over WebSocket. No refresh, no merge conflicts.",
+  },
+  {
+    title: "Run it inline",
+    body: "JavaScript, Python, Java, and C++ compile and run from the editor. Output lands in the console below.",
+  },
+  {
+    title: "Nothing to install",
+    body: "Create a room, share the ID, start typing. The whole toolchain lives in the browser.",
+  },
+];
+
 const HomePage = () => {
   const toast = useToast();
-
   const [NewId, setNewId] = useState("");
-
   const [user, setUser] = useState("");
+  const nav = useRouter();
 
   const CreateId = (e) => {
-    e.preventDefault();
-    const id = crypto.randomUUID();
-    setNewId(id);
+    e?.preventDefault?.();
+    setNewId(crypto.randomUUID());
   };
-
-  const nav = useRouter();
 
   const JoinNow = () => {
     if (!NewId || !user) {
       toast({
         status: "error",
-        description: "Please Fill All The Details",
-        duration: 1000,
+        description: "Enter a room ID and your name to join.",
+        duration: 2000,
       });
       return;
     }
@@ -33,52 +54,205 @@ const HomePage = () => {
   };
 
   const handleEnter = (e) => {
-    if (e.code === "Enter") {
-      JoinNow();
-    }
+    if (e.code === "Enter") JoinNow();
   };
 
+  const ready = Boolean(NewId && user);
+
   return (
-    <VStack minH={"100dvh"} justify={"center"} align={"center"}>
-      <Box
-        p={6}
-        maxW="sm"
-        borderWidth="1px"
-        borderRadius="lg"
-        overflow="hidden"
+    <Box bg="canvas" minH="100dvh">
+      {/* Nav */}
+      <Flex
+        as="nav"
+        position="sticky"
+        top="0"
+        zIndex="10"
+        bg="canvas"
+        borderBottom="1px solid"
+        borderColor="hairline"
+        px={{ base: "md", lg: "lg" }}
+        py="sm"
+        align="center"
+        justify="space-between"
       >
-        <VStack spacing={6} p={"2.5"}>
-          <Input
-            value={NewId}
-            type="text"
-            onChange={(e) => setNewId(e.target.value)}
-            placeholder="Enter id"
-            size="lg"
-          />
-          <Input
-            onChange={(e) => setUser(e.target.value)}
-            type="text"
-            value={user}
-            placeholder="Enter username.."
-            onKeyUp={handleEnter}
-            size="lg"
-          />
+        <HStack spacing="xs">
+          <Text as="span" textStyle="labelSm" color="ink" fontWeight="600">
+            Realtime
+          </Text>
+        </HStack>
+        <HStack spacing="xs" display={{ base: "none", sm: "flex" }}>
+          <Link href="#features" textStyle="bodySm" color="body" px="sm" py="xs" _hover={{ color: "ink" }}>
+            Features
+          </Link>
+          <Link href="#start" textStyle="bodySm" color="body" px="sm" py="xs" _hover={{ color: "ink" }}>
+            Start
+          </Link>
+        </HStack>
+        <Button variant="primarySm" onClick={CreateId}>
+          Create room
+        </Button>
+      </Flex>
 
-          <HStack>
-            {!NewId ? (
-              <Button colorScheme="green" onClick={CreateId}>
-                Create New Id
-              </Button>
-            ) : null}
+      {/* Hero — mesh gradient is the only color on the page */}
+      <Box
+        id="start"
+        position="relative"
+        overflow="hidden"
+        px="md"
+        pt={{ base: "4xl", md: "section" }}
+        pb={{ base: "4xl", md: "4xl" }}
+      >
+        <Box
+          aria-hidden="true"
+          position="absolute"
+          inset="-10% -10% auto -10%"
+          h="640px"
+          animation="meshDrift 18s ease-in-out infinite"
+          background="
+            radial-gradient(38% 46% at 18% 32%, rgba(0,223,216,0.42), transparent 70%),
+            radial-gradient(42% 50% at 42% 24%, rgba(0,124,240,0.34), transparent 70%),
+            radial-gradient(40% 48% at 66% 36%, rgba(121,40,202,0.30), transparent 70%),
+            radial-gradient(36% 44% at 84% 26%, rgba(255,0,128,0.24), transparent 70%),
+            radial-gradient(34% 42% at 55% 58%, rgba(249,203,40,0.28), transparent 70%)"
+          filter="blur(40px)"
+          maskImage="radial-gradient(120% 100% at 50% 20%, black 30%, transparent 100%)"
+          WebkitMaskImage="radial-gradient(120% 100% at 50% 20%, black 30%, transparent 100%)"
+        />
+        <VStack
+          position="relative"
+          spacing="lg"
+          align="center"
+          textAlign="center"
+          maxW="820px"
+          mx="auto"
+          animation="fadeUp .5s ease-out both"
+        >
+          <Text as="h1" textStyle="displayXl" maxW="16ch">
+            Write code together, in real time.
+          </Text>
+          <Text as="p" textStyle="bodyLg" maxW="60ch">
+            Create a room, share the ID, and ship from one shared editor. Live
+            sync, multi-language runs, zero setup.
+          </Text>
 
-            <Button colorScheme="blue" onClick={JoinNow}>
-              Join Now
-            </Button>
-          </HStack>
+          {/* Join panel */}
+          <Box
+            w={{ base: "100%", sm: "440px" }}
+            bg="elevated"
+            border="1px solid"
+            borderColor="hairline"
+            rounded="lg"
+            p="lg"
+            textAlign="left"
+            boxShadow="0 2px 2px rgba(0,0,0,0.04), 0 8px 16px -4px rgba(0,0,0,0.08)"
+          >
+            <VStack spacing="sm">
+              <Box w="full">
+                <Text as="label" htmlFor="room-id" textStyle="monoEyebrow" color="mute" display="block" mb="xs">
+                  Room ID
+                </Text>
+                <Input
+                  id="room-id"
+                  value={NewId}
+                  type="text"
+                  onChange={(e) => setNewId(e.target.value)}
+                  placeholder="Paste an ID or create a new room"
+                  autoComplete="off"
+                />
+              </Box>
+              <Box w="full">
+                <Text as="label" htmlFor="username" textStyle="monoEyebrow" color="mute" display="block" mb="xs">
+                  Your name
+                </Text>
+                <Input
+                  id="username"
+                  value={user}
+                  type="text"
+                  onChange={(e) => setUser(e.target.value)}
+                  placeholder="How teammates see you"
+                  onKeyUp={handleEnter}
+                  autoComplete="off"
+                />
+              </Box>
+              <Flex w="full" gap="sm" pt="xs">
+                <Button variant="secondaryPill" flex="1" onClick={CreateId}>
+                  {NewId ? "New ID" : "Create room"}
+                </Button>
+                <Button variant="primaryPill" flex="1" isDisabled={!ready} onClick={JoinNow}>
+                  Join room
+                </Button>
+              </Flex>
+            </VStack>
+          </Box>
         </VStack>
       </Box>
-    </VStack>
+
+
+      {/* Features — hairline card grid */}
+      <Box id="features" maxW="1200px" mx="auto" px="md" py={{ base: "3xl", md: "4xl" }}>
+        <Text as="h2" textStyle="headingLg" maxW="20ch" mb="xl">
+          An editor that behaves like a product, not a demo.
+        </Text>
+        <Flex gap="lg" direction={{ base: "column", md: "row" }}>
+          {FEATURES.map((f) => (
+            <Box
+              key={f.title}
+              flex="1"
+              bg="elevated"
+              border="1px solid"
+              borderColor="hairline"
+              rounded="md"
+              p="lg"
+              transition="border-color .15s ease"
+              _hover={{ borderColor: "#d4d4d4" }}
+            >
+              <Text as="h3" textStyle="headingMd" mb="xs">
+                {f.title}
+              </Text>
+              <Text as="p" textStyle="bodySm" fontSize="14px" lineHeight="22px">
+                {f.body}
+              </Text>
+            </Box>
+          ))}
+        </Flex>
+      </Box>
+
+      {/* CTA band */}
+      <Box borderTop="1px solid" borderColor="hairline" px="md" py={{ base: "3xl", md: "4xl" }}>
+        <VStack spacing="md">
+          <Text as="h2" textStyle="headingLg" textAlign="center">
+            Start a room in one click.
+          </Text>
+          <Button variant="primaryPill" onClick={CreateId}>
+            Create room
+          </Button>
+        </VStack>
+      </Box>
+
+      {/* Footer */}
+      <Flex
+        as="footer"
+        borderTop="1px solid"
+        borderColor="hairline"
+        px={{ base: "md", lg: "lg" }}
+        py="3xl"
+        direction={{ base: "column", sm: "row" }}
+        align="center"
+        justify="space-between"
+        gap="sm"
+      >
+        <HStack spacing="xs">
+          <Text as="span" textStyle="labelSm" color="ink" fontWeight="600">
+            Realtime
+          </Text>
+        </HStack>
+        <Text as="span" textStyle="bodySm" color="mute">
+          Built for pairs, teams, and interviews.
+        </Text>
+      </Flex>
+    </Box>
   );
 };
 
 export default HomePage;
+

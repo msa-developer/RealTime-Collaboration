@@ -9,7 +9,11 @@ const Collaborate = () => {
   const [data, setData] = useState([]);
 
   return (
-    <Flex minH={"100dvh"}>
+    <Flex
+      minH={{ base: "auto", md: "100dvh" }}
+      direction={{ base: "column", md: "row" }}
+      bg="canvas"
+    >
       <SlideBar data={data} />
       <CodingArea setUsers={setData} />
     </Flex>
