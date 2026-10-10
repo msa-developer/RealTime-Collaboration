@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Avatar,
   Box,
@@ -11,15 +13,15 @@ import {
   VStack,
   useToast,
 } from "@chakra-ui/react";
-import { useNavigate, useParams, useLocation } from "react-router";
+import { useRouter, useParams } from "next/navigation";
 import socket from "../services/socket";
+import { getUsername } from "../services/username";
 
 const SlideBar = ({ data }) => {
   const { colorMode, toggleColorMode } = useColorMode();
-  const nav = useNavigate();
+  const nav = useRouter();
   const { id: roomId } = useParams();
-  const location = useLocation();
-  const username = location.state?.username || "Anonymous";
+  const username = getUsername();
   const toast = useToast();
 
   const copyRoomId = () => {
@@ -33,7 +35,7 @@ const SlideBar = ({ data }) => {
 
   const leaveRoom = () => {
     socket.emit("leaveRoom", { roomId, username });
-    nav("/");
+    nav.push("/");
   };
 
   return (

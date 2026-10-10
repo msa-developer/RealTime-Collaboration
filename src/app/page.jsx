@@ -1,7 +1,8 @@
+"use client";
+
 import { Box, Button, HStack, Input, useToast, VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { useNavigate } from "react-router";
-import { v4 as uuid } from "uuid";
+import { useRouter } from "next/navigation";
 
 const HomePage = () => {
   const toast = useToast();
@@ -12,12 +13,11 @@ const HomePage = () => {
 
   const CreateId = (e) => {
     e.preventDefault();
-    const id = uuid();
+    const id = crypto.randomUUID();
     setNewId(id);
-    console.log(id);
   };
 
-  const nav = useNavigate();
+  const nav = useRouter();
 
   const JoinNow = () => {
     if (!NewId || !user) {
@@ -28,11 +28,8 @@ const HomePage = () => {
       });
       return;
     }
-    nav(`/editor/${NewId}`, {
-      state: {
-        username: user,
-      },
-    });
+    sessionStorage.setItem("username", user);
+    nav.push(`/editor/${NewId}`);
   };
 
   const handleEnter = (e) => {
@@ -42,7 +39,7 @@ const HomePage = () => {
   };
 
   return (
-    <VStack minH={"100vh"} justify={"center"} align={"center"}>
+    <VStack minH={"100dvh"} justify={"center"} align={"center"}>
       <Box
         p={6}
         maxW="sm"

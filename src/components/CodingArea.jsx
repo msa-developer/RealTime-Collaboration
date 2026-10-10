@@ -1,9 +1,18 @@
+"use client";
+
 import { Box, Button, Flex, HStack, Select, Text, useToast } from "@chakra-ui/react";
-import { Editor } from "@monaco-editor/react";
+import dynamic from "next/dynamic";
 import { useRef, useState, useEffect } from "react";
-import { useNavigate, useParams, useLocation } from "react-router";
+import { useRouter, useParams } from "next/navigation";
 import socket from "../services/socket";
+import { getUsername } from "../services/username";
 import { ArrowLeftIcon, PlayIcon } from "./icons";
+
+/* Monaco touches window — never render it on the server */
+const Editor = dynamic(
+  () => import("@monaco-editor/react").then((m) => m.Editor),
+  { ssr: false },
+);
 
 const LANGUAGES = [
   { id: "javascript", label: "JavaScript", monaco: "javascript" },
@@ -78,10 +87,9 @@ const CodingArea = ({ setUsers }) => {
   const [codeValue, setCodeValue] = useState("");
   const EditorRef = useRef();
   const { id: roomId } = useParams();
-  const location = useLocation();
-  const username = location.state?.username || "Anonymous";
+  const username = getUsername();
   const toast = useToast();
-  const nav = useNavigate();
+  const nav = useRouter();
   const typingTimeoutRef = useRef(null);
   const [typingToastId, setTypingToastId] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -308,7 +316,7 @@ const CodingArea = ({ setUsers }) => {
         <HStack spacing="sm" minW="0">
           <Box
             as="button"
-            onClick={() => nav("/")}
+            onClick={() => nav.push("/")}
             title="Back to home"
             display="flex"
             alignItems="center"
