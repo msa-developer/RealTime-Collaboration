@@ -52,7 +52,7 @@ const exec = (cmd, args, cwd) =>
       const hint =
         e?.code === "ENOENT"
           ? `${MISSING[cmd] || `Command "${cmd}" not found on the server.`} ` +
-            "Render native images ship no JDK — deploy via Docker (Dockerfile in repo root)."
+            "Live service runs Render native image — Dashboard: Settings → Runtime → Docker, then Manual Deploy."
           : e.message;
       resolve({ stdout, stderr: cap(stderr + hint), code: 127 });
     });

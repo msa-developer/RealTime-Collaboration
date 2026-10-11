@@ -1,10 +1,10 @@
-FROM node:22-bookworm
+FROM node:22-bookworm-slim
 
-# ponytail: one apt layer covers java/python/cpp runners; Render native has
-# no JDK and no apt.txt mechanism, Docker is the only way to add it
+# ponytail: jdk-headless keeps image small on free tier; javac still included
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends default-jdk python3 g++ \
-  && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends default-jdk-headless python3 g++ \
+  && rm -rf /var/lib/apt/lists/* \
+  && javac -version && java -version && python3 --version && g++ --version
 
 WORKDIR /app
 COPY package*.json ./
