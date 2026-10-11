@@ -16,6 +16,19 @@ const RTC_CONFIG = {
    a per-render WeakMap would hand out a second transceiver for the same peer. */
 const AUDIO_TX = new WeakMap(); // RTCPeerConnection -> RTCRtpTransceiver
 
+/* Serialize every operation on one RTCPeerConnection. Two async chains — our own
+   offer and an incoming offer — otherwise interleave mid-negotiation: the second
+   setLocalDescription throws InvalidStateError in have-remote-offer, the throw is
+   swallowed, and that peer silently never hears anyone. Module scope like
+   AUDIO_TX so the queue survives re-renders. */
+const NEG_QUEUE = new WeakMap(); // RTCPeerConnection -> Promise
+const negotiate = (pc, task) => {
+  const prev = NEG_QUEUE.get(pc) || Promise.resolve();
+  const next = prev.then(task, task); // run even if the previous op failed
+  NEG_QUEUE.set(pc, next.catch(() => {}));
+  return next;
+};
+
 const useVoice = (roomId) => {
   const [muted, setMuted] = useState(true);
   const [joined, setJoined] = useState(false);
@@ -28,6 +41,7 @@ const useVoice = (roomId) => {
   const offerPending = useRef(new Set());
   const peersRef = useRef(new Map()); // peer socketId -> RTCPeerConnection
   const audioRef = useRef(new Map()); // peer socketId -> HTMLAudioElement
+  const streamsRef = useRef(new Map()); // peer socketId -> MediaStream (see ontrack)
 
   const signal = useCallback(
     (to, data) => {
@@ -37,7 +51,9 @@ const useVoice = (roomId) => {
   );
 
   const dropPeer = useCallback((peerId) => {
-    peersRef.current.get(peerId)?.close();
+    const pc = peersRef.current.get(peerId);
+    pc?.close();
+    if (pc) NEG_QUEUE.delete(pc);
     peersRef.current.delete(peerId);
     offerPending.current.delete(peerId);
     const el = audioRef.current.get(peerId);
@@ -46,6 +62,7 @@ const useVoice = (roomId) => {
       el.srcObject = null;
       el.remove();
       audioRef.current.delete(peerId);
+      streamsRef.current.delete(peerId);
     }
   }, []);
 
@@ -94,6 +111,18 @@ const useVoice = (roomId) => {
         }
       };
       pc.ontrack = (e) => {
+        /* A transceiver whose mic was attached with replaceTrack() has no
+           MediaStream association, so ontrack arrives with an EMPTY e.streams.
+           Assigning e.streams[0] then gives this element no source and the room
+           hears silence even though RTP is flowing. Own a stream per peer and
+           add the track to it; addTrack is idempotent across renegotiation. */
+        let stream = streamsRef.current.get(peerId);
+        if (!stream) {
+          stream = new MediaStream();
+          streamsRef.current.set(peerId, stream);
+        }
+        stream.addTrack(e.track);
+
         let el = audioRef.current.get(peerId);
         if (!el) {
           el = new Audio();
@@ -103,7 +132,8 @@ const useVoice = (roomId) => {
           el.style.display = "none";
           document.body.appendChild(el);
         }
-        el.srcObject = e.streams[0];
+        /* Reassigning an equal srcObject is a no-op that can glitch playback. */
+        if (el.srcObject !== stream) el.srcObject = stream;
         el.play().catch(() => setBlocked(true));
       };
       return pc;
@@ -111,25 +141,28 @@ const useVoice = (roomId) => {
     [signal],
   );
 
-  /* One offer in flight per peer. */
+  /* One offer in flight per peer. The state check and setLocalDescription both
+     run inside the peer's queue, so an incoming offer can't slip between them. */
   const offerPeer = useCallback(
     async (peerId) => {
       const pc = ensurePeer(peerId);
-      if (
-        !pc ||
-        pc.signalingState !== "stable" ||
-        offerPending.current.has(peerId)
-      ) {
-        return;
-      }
-      attachMic(pc); // reserve the audio m-line the offer will carry
-      offerPending.current.add(peerId);
-      try {
-        await pc.setLocalDescription(await pc.createOffer());
-        signal(peerId, { sdp: pc.localDescription });
-      } catch {
-        offerPending.current.delete(peerId);
-      }
+      if (!pc) return;
+      await negotiate(pc, async () => {
+        if (
+          pc.signalingState !== "stable" ||
+          offerPending.current.has(peerId)
+        ) {
+          return;
+        }
+        attachMic(pc); // reserve the audio m-line the offer will carry
+        offerPending.current.add(peerId);
+        try {
+          await pc.setLocalDescription(await pc.createOffer());
+          signal(peerId, { sdp: pc.localDescription });
+        } catch {
+          offerPending.current.delete(peerId);
+        }
+      });
     },
     [ensurePeer, attachMic, signal],
   );
@@ -184,34 +217,38 @@ const useVoice = (roomId) => {
     const onSignal = async ({ from, data }) => {
       const pc = ensurePeer(from);
       if (!pc) return;
-      try {
-        if (data.sdp) {
-          const collision =
-            data.sdp.type === "offer" &&
-            (pc.signalingState !== "stable" ||
-              offerPending.current.has(from));
-          if (collision) {
-            /* We sent the higher-priority offer: ignore theirs. Otherwise roll
-               back our own and take theirs (perfect-negotiation, polite side). */
-            if (from < socket.id) return;
-            await pc.setLocalDescription({ type: "rollback" });
+      /* Same queue as offerPeer: an inbound offer and our own outbound offer must
+         never touch setLocalDescription at the same time. */
+      await negotiate(pc, async () => {
+        try {
+          if (data.sdp) {
+            const collision =
+              data.sdp.type === "offer" &&
+              (pc.signalingState !== "stable" ||
+                offerPending.current.has(from));
+            if (collision) {
+              /* We sent the higher-priority offer: ignore theirs. Otherwise roll
+                 back our own and take theirs (perfect-negotiation, polite side). */
+              if (from < socket.id) return;
+              await pc.setLocalDescription({ type: "rollback" });
+            }
+            await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            if (data.sdp.type === "offer") {
+              /* Attach our mic before answering. Skipping this answers recvonly
+                 and the peer never hears us, even though our icon shows unmuted. */
+              attachMic(pc);
+              await pc.setLocalDescription(await pc.createAnswer());
+              signal(from, { sdp: pc.localDescription });
+            }
+            /* Their answer arrived — our pending offer to them is settled. */
+            if (data.sdp.type === "answer") offerPending.current.delete(from);
+          } else if (data.candidate) {
+            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
           }
-          await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-          if (data.sdp.type === "offer") {
-            /* Attach our mic before answering. Skipping this answers recvonly
-               and the peer never hears us, even though our icon shows unmuted. */
-            attachMic(pc);
-            await pc.setLocalDescription(await pc.createAnswer());
-            signal(from, { sdp: pc.localDescription });
-          }
-          /* Their answer arrived — our pending offer to them is settled. */
-          if (data.sdp.type === "answer") offerPending.current.delete(from);
-        } else if (data.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (err) {
+          console.error("voice signal error:", err);
         }
-      } catch (err) {
-        console.error("voice signal error:", err);
-      }
+      });
     };
 
     const onUserList = (users) => {
