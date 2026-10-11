@@ -33,6 +33,7 @@ const HomePage = () => {
   const toast = useToast();
   const [NewId, setNewId] = useState("");
   const [user, setUser] = useState("");
+  const [roomName, setRoomName] = useState("");
   const nav = useRouter();
 
   const CreateId = (e) => {
@@ -41,15 +42,16 @@ const HomePage = () => {
   };
 
   const JoinNow = () => {
-    if (!NewId || !user) {
+    if (!NewId || !user || !roomName) {
       toast({
         status: "error",
-        description: "Enter a room ID and your name to join.",
+        description: "Enter a room ID, room name, and your name to join.",
         duration: 2000,
       });
       return;
     }
     sessionStorage.setItem("username", user);
+    sessionStorage.setItem("roomName", roomName);
     nav.push(`/editor/${NewId}`);
   };
 
@@ -57,7 +59,7 @@ const HomePage = () => {
     if (e.code === "Enter") JoinNow();
   };
 
-  const ready = Boolean(NewId && user);
+  const ready = Boolean(NewId && user && roomName);
 
   return (
     <Box bg="canvas" minH="100dvh">
@@ -161,6 +163,19 @@ const HomePage = () => {
                   type="text"
                   onChange={(e) => setNewId(e.target.value)}
                   placeholder="Paste an ID or create a new room"
+                  autoComplete="off"
+                />
+              </Box>
+              <Box w="full">
+                <Text as="label" htmlFor="room-name" textStyle="monoEyebrow" color="mute" display="block" mb="xs">
+                  Room name
+                </Text>
+                <Input
+                  id="room-name"
+                  value={roomName}
+                  type="text"
+                  onChange={(e) => setRoomName(e.target.value)}
+                  placeholder="e.g. Sprint 12 pairing"
                   autoComplete="off"
                 />
               </Box>

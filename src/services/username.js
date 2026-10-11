@@ -3,3 +3,6 @@
 export const getUsername = () =>
   (typeof window !== "undefined" && sessionStorage.getItem("username")) ||
   "Anonymous";
+
+export const getRoomName = () =>
+  (typeof window !== "undefined" && sessionStorage.getItem("roomName")) || "";
