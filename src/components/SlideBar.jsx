@@ -18,13 +18,14 @@ import { useEffect, useState } from "react";
 import socket from "../services/socket";
 import useVoice from "../services/useVoice";
 import { getRoomName, getUsername } from "../services/username";
-import { CopyIcon, MicIcon, MicOffIcon } from "./icons";
+import { CopyIcon, MenuIcon, CloseIcon, MicIcon, MicOffIcon } from "./icons";
 
 const SlideBar = ({ data }) => {
   const nav = useRouter();
   const { id: roomId } = useParams();
   const [username, setUsername] = useState("Anonymous");
   const [roomName, setRoomName] = useState("");
+  const [open, setOpen] = useState(false);
   const { muted, toggle, error } = useVoice(roomId);
   const toast = useToast();
 
@@ -56,33 +57,102 @@ const SlideBar = ({ data }) => {
   };
 
   return (
-    <Box
-      as="aside"
-      w={{ base: "full", md: "280px" }}
-      flexShrink={0}
-      bg="canvas"
-      borderRight={{ base: "none", md: "1px solid" }}
-      borderBottom={{ base: "1px solid", md: "none" }}
-      borderColor="hairline"
-      px={{ base: "sm", md: "lg" }}
-      py={{ base: "xs", md: "lg" }}
-      display="flex"
-      flexDirection={{ base: "row", md: "column" }}
-      alignItems={{ base: "center", md: "stretch" }}
-      gap={{ base: "sm", md: "md" }}
-      maxH={{ base: "none", md: "100dvh" }}
-    >
-      {/* Room identity — eyebrow + copy button belong to the desktop column only */}
-      <Box flex={{ base: 1, md: "none" }} minW={0}>
+    <>
+      {/* Mobile: collapsed bar with a button that opens the full slide bar */}
+      <HStack
+        display={{ base: "flex", md: "none" }}
+        w="full"
+        spacing="xs"
+        px="md"
+        py="xs"
+        bg="canvas"
+        borderBottom="1px solid"
+        borderColor="hairline"
+        flexShrink={0}
+      >
+        <IconButton
+          aria-label="Open slide bar"
+          title="Open slide bar"
+          icon={<MenuIcon />}
+          onClick={() => setOpen(true)}
+          size="sm"
+          variant="ghost"
+          color="ink"
+          _hover={{ bg: "hairlineSoft" }}
+        />
+        <HStack spacing={-1}>
+          {data.slice(0, 4).map((user) => (
+            <Avatar
+              key={user.socketId}
+              name={user.username}
+              size="xs"
+              border="2px solid"
+              borderColor="canvas"
+            />
+          ))}
+        </HStack>
         <Text
-          as="p"
-          textStyle="monoEyebrow"
-          color="mute"
-          mb="xs"
-          display={{ base: "none", md: "block" }}
+          as="span"
+          fontFamily="mono"
+          fontSize="12px"
+          color="ink"
+          bg="hairlineSoft"
+          border="1px solid"
+          borderColor="hairline"
+          rounded="pill"
+          px="xs"
         >
-          Room
+          {data.length}
         </Text>
+        <IconButton
+          aria-label="Copy room ID"
+          title="Copy room ID"
+          icon={<CopyIcon />}
+          onClick={copyRoomId}
+          size="sm"
+          variant="ghostSm"
+        />
+        <Button variant="dangerSm" size="sm" onClick={leaveRoom}>
+          Leave
+        </Button>
+      </HStack>
+
+      <Box
+        as="aside"
+        w={{ base: "full", md: "280px" }}
+        flexShrink={0}
+        bg="canvas"
+        borderRight="1px solid"
+        borderColor="hairline"
+        px={{ base: "md", md: "lg" }}
+        py={{ base: "md", md: "lg" }}
+        display={{ base: open ? "flex" : "none", md: "flex" }}
+        flexDirection="column"
+        gap="md"
+        maxH="100dvh"
+        overflowY="auto"
+        position={{ base: open ? "fixed" : "relative", md: "relative" }}
+        inset={{ base: open ? 0 : "auto", md: "auto" }}
+        zIndex={20}
+      >
+      {/* Room identity — close button collapses the slide bar on mobile */}
+      <Box minW={0}>
+        <HStack justify="space-between" align="center" mb="xs">
+          <Text as="p" textStyle="monoEyebrow" color="mute">
+            Room
+          </Text>
+          <IconButton
+            aria-label="Close slide bar"
+            title="Close slide bar"
+            icon={<CloseIcon />}
+            onClick={() => setOpen(false)}
+            size="sm"
+            variant="ghost"
+            color="ink"
+            display={{ base: "flex", md: "none" }}
+            _hover={{ bg: "hairlineSoft" }}
+          />
+        </HStack>
         <Text
           as="p"
           textStyle="labelSm"
@@ -99,18 +169,16 @@ const SlideBar = ({ data }) => {
           mt="sm"
           leftIcon={<CopyIcon />}
           onClick={copyRoomId}
-          display={{ base: "none", md: "flex" }}
         >
           Copy room ID
         </Button>
       </Box>
 
-      {/* Connected users — desktop column */}
+      {/* Connected users */}
       <Flex
         direction="column"
         minH="0"
         flex="1"
-        display={{ base: "none", md: "flex" }}
       >
         <HStack justify="space-between" mb="xs">
           <Text as="p" textStyle="monoEyebrow" color="mute">
@@ -205,54 +273,11 @@ const SlideBar = ({ data }) => {
         </VStack>
       </Flex>
 
-      {/* Mobile bar: presence + actions in one thumb-reach row */}
-      <HStack spacing="xs" flexShrink={0} display={{ base: "flex", md: "none" }}>
-        <HStack spacing={-1}>
-          {data.slice(0, 4).map((user) => (
-            <Avatar
-              key={user.socketId}
-              name={user.username}
-              size="xs"
-              border="2px solid"
-              borderColor="canvas"
-            />
-          ))}
-        </HStack>
-        <Text
-          as="span"
-          fontFamily="mono"
-          fontSize="12px"
-          color="ink"
-          bg="hairlineSoft"
-          border="1px solid"
-          borderColor="hairline"
-          rounded="pill"
-          px="xs"
-        >
-          {data.length}
-        </Text>
-        <IconButton
-          aria-label="Copy room ID"
-          title="Copy room ID"
-          icon={<CopyIcon />}
-          onClick={copyRoomId}
-          size="sm"
-          variant="ghostSm"
-        />
-        <Button variant="dangerSm" size="sm" onClick={leaveRoom}>
-          Leave
-        </Button>
-      </HStack>
-
-      <Button
-        variant="dangerSm"
-        w="full"
-        onClick={leaveRoom}
-        display={{ base: "none", md: "flex" }}
-      >
+      <Button variant="dangerSm" w="full" mt="md" onClick={leaveRoom}>
         Leave room
       </Button>
-    </Box>
+      </Box>
+    </>
   );
 };
 
