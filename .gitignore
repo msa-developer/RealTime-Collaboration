@@ -27,3 +27,6 @@ dist-ssr
 .env
 
 .playwright-cli/
+
+# LibreOffice lock files
+.~lock.*#
