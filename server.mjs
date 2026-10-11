@@ -28,6 +28,14 @@ const rooms = {};
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
+  socket.on("checkRoom", ({ roomId } = {}, ack) => {
+    const id = typeof roomId === "string" ? roomId.trim() : "";
+    const room = id ? rooms[id] : undefined;
+    if (typeof ack === "function") {
+      ack({ exists: Boolean(room), name: room?.name || "" });
+    }
+  });
+
   socket.on("joinRoom", ({ roomId, username, roomName }) => {
     socket.join(roomId);
 

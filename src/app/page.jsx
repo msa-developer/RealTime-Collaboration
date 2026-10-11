@@ -11,8 +11,10 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import socket from "../services/socket";
+import { classifyRoom } from "../services/roomStatus";
 
 const FEATURES = [
   {
@@ -35,6 +37,23 @@ const HomePage = () => {
   const [user, setUser] = useState("");
   const [roomName, setRoomName] = useState("");
   const nav = useRouter();
+  const [roomInfo, setRoomInfo] = useState(null); // null = unknown/checking
+
+  /* Ask the server whether this room ID exists (debounced while typing). */
+  useEffect(() => {
+    const id = NewId.trim();
+    if (!id) {
+      setRoomInfo(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      socket.emit("checkRoom", { roomId: id }, (info) => setRoomInfo(info));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [NewId]);
+
+  const action = classifyRoom({ roomId: NewId, roomName, serverRoom: roomInfo });
+  const nameWrong = action === "nameMismatch";
 
   const CreateId = (e) => {
     e?.preventDefault?.();
@@ -42,24 +61,35 @@ const HomePage = () => {
   };
 
   const JoinNow = () => {
-    if (!NewId || !user || !roomName) {
+    if (!user.trim()) {
       toast({
         status: "error",
-        description: "Enter a room ID, room name, and your name to join.",
+        description: "Enter your name so teammates can see you.",
         duration: 2000,
       });
       return;
     }
-    sessionStorage.setItem("username", user);
-    sessionStorage.setItem("roomName", roomName);
-    nav.push(`/editor/${NewId}`);
+    if (action !== "join" && action !== "create") {
+      toast({
+        status: "error",
+        description:
+          action === "nameMismatch"
+            ? "Room ID is in use with a different room name. Fix the name or create a new ID."
+            : "Enter a room ID and room name first.",
+        duration: 2500,
+      });
+      return;
+    }
+    sessionStorage.setItem("username", user.trim());
+    sessionStorage.setItem("roomName", roomName.trim());
+    nav.push(`/editor/${NewId.trim()}`);
   };
 
   const handleEnter = (e) => {
     if (e.code === "Enter") JoinNow();
   };
 
-  const ready = Boolean(NewId && user && roomName);
+  const ready = (action === "join" || action === "create") && Boolean(user.trim());
 
   return (
     <Box bg="canvas" minH="100dvh">
@@ -177,7 +207,33 @@ const HomePage = () => {
                   onChange={(e) => setRoomName(e.target.value)}
                   placeholder="e.g. Sprint 12 pairing"
                   autoComplete="off"
+                  isInvalid={nameWrong}
+                  aria-invalid={nameWrong}
+                  aria-describedby={nameWrong ? "room-name-error" : undefined}
+                  borderColor={nameWrong ? "errorDeep" : undefined}
+                  _hover={nameWrong ? { borderColor: "errorDeep" } : undefined}
+                  _focus={
+                    nameWrong
+                      ? {
+                          borderColor: "errorDeep",
+                          boxShadow: "0 0 0 3px rgba(238,0,0,0.15)",
+                          outline: "none",
+                        }
+                      : undefined
+                  }
                 />
+                {nameWrong && (
+                  <Text
+                    id="room-name-error"
+                    w="full"
+                    fontSize="13px"
+                    lineHeight="20px"
+                    color="errorDeep"
+                  >
+                    Wrong room name for this Room ID. The ID already exists —
+                    type the exact room name, or click New ID for a free one.
+                  </Text>
+                )}
               </Box>
               <Box w="full">
                 <Text as="label" htmlFor="username" textStyle="monoEyebrow" color="mute" display="block" mb="xs">
@@ -198,9 +254,19 @@ const HomePage = () => {
                   {NewId ? "New ID" : "Create room"}
                 </Button>
                 <Button variant="primaryPill" flex="1" isDisabled={!ready} onClick={JoinNow}>
-                  Join room
+                  {action === "create" ? "Create room" : "Join room"}
                 </Button>
               </Flex>
+              {action === "join" && (
+                <Text w="full" fontSize="13px" lineHeight="20px" color="mute">
+                  Room found. Ready to join.
+                </Text>
+              )}
+              {action === "create" && (
+                <Text w="full" fontSize="13px" lineHeight="20px" color="mute">
+                  New room. It will be created when you continue.
+                </Text>
+              )}
             </VStack>
           </Box>
         </VStack>
