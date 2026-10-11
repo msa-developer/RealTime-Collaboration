@@ -36,6 +36,7 @@ const theme = extendTheme({
     "2xl": "40px",
     "3xl": "64px",
     "4xl": "96px",
+    section: "128px",
   },
   radii: { sm: "6px", md: "12px", lg: "16px", pill: "100px" },
   keyframes: {

@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import socket from "../services/socket";
 import { classifyRoom } from "../services/roomStatus";
+import { newRoomId } from "../services/roomId";
 
 const FEATURES = [
   {
@@ -57,7 +58,7 @@ const HomePage = () => {
 
   const CreateId = (e) => {
     e?.preventDefault?.();
-    setNewId(crypto.randomUUID());
+    setNewId(newRoomId());
   };
 
   const JoinNow = () => {
