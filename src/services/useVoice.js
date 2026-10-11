@@ -145,7 +145,7 @@ const useVoice = (roomId) => {
     };
   }, [roomId, ensurePeer, dropPeer]);
 
-  return { muted, joined, error };
+  return { muted, joined, toggle, error };
 };
 
 export default useVoice;
