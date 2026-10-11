@@ -24,6 +24,9 @@ const io = new Server(server, {
 });
 
 const rooms = {};
+/* roomId -> Set of socket ids currently in voice (independent of `rooms`, so a
+   voice-join that races joinRoom is still recorded). */
+const voice = {};
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
@@ -76,24 +79,35 @@ io.on("connection", (socket) => {
 
       socket.to(roomId).emit("userLeft", username);
       io.to(roomId).emit("userListUpdate", rooms[roomId].users);
+      leaveVoice(socket, roomId);
 
       socket.leave(roomId);
     }
   });
 
-  /* Voice chat: announce join so existing voice members send offers,
-     and relay WebRTC SDP/ICE between two specific sockets. */
+  /* Voice chat: the server owns the per-room voice roster. Only the newcomer
+     offers, so N users joining at once can never glare with each other —
+     each pair settles on exactly one offer/answer. Relaying is still needed
+     for SDP/ICE between two specific sockets. */
   socket.on("voice-join", ({ roomId }) => {
-    if (rooms[roomId]) {
-      socket.to(roomId).emit("voice-join", { from: socket.id });
-    }
+    if (!voice[roomId]) voice[roomId] = new Set();
+    const existing = [...voice[roomId]];
+    voice[roomId].add(socket.id);
+    /* Tracked separately from `rooms` so it works even if this arrives
+       before "joinRoom" has created the room. */
+    socket.emit("voice-peers", existing);
   });
 
   socket.on("voice-signal", ({ roomId, to, data }) => {
-    if (rooms[roomId] && typeof to === "string" && data) {
+    if (typeof to === "string" && data) {
       io.to(to).emit("voice-signal", { from: socket.id, data });
     }
   });
+
+  const leaveVoice = (socket, roomId) => {
+    const roster = voice[roomId];
+    if (roster?.delete(socket.id) && !roster.size) delete voice[roomId];
+  };
 
   socket.on("voiceMute", ({ roomId, muted }) => {
     const room = rooms[roomId];
@@ -141,6 +155,7 @@ io.on("connection", (socket) => {
 
         socket.to(roomId).emit("userLeft", user.username);
         io.to(roomId).emit("userListUpdate", rooms[roomId].users);
+        leaveVoice(socket, roomId);
         break;
       }
     }

@@ -26,7 +26,7 @@ const SlideBar = ({ data }) => {
   const [username, setUsername] = useState("Anonymous");
   const [roomName, setRoomName] = useState("");
   const [open, setOpen] = useState(false);
-  const { muted, toggle, error } = useVoice(roomId);
+  const { muted, toggle, error, blocked } = useVoice(roomId);
   const toast = useToast();
 
   useEffect(() => {
@@ -45,6 +45,26 @@ const SlideBar = ({ data }) => {
       toast({ title: error, status: "error", duration: 5000, isClosable: true });
     }
   }, [error, toast]);
+
+  /* Browser blocked audio autoplay: a click anywhere grants it. Retry on the
+     next interaction so the user is not stuck in silence. */
+  useEffect(() => {
+    if (!blocked) return;
+    const resume = () => {
+      document
+        .querySelectorAll("audio")
+        .forEach((el) => el.play().catch(() => {}));
+    };
+    document.addEventListener("click", resume, { once: true });
+    toast({
+      title: "Voice is muted by your browser",
+      description: "Click anywhere once to allow audio playback.",
+      status: "warning",
+      duration: null,
+      isClosable: true,
+    });
+    return () => document.removeEventListener("click", resume);
+  }, [blocked, toast]);
 
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId);
