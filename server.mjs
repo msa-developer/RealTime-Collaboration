@@ -28,11 +28,16 @@ const rooms = {};
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("joinRoom", ({ roomId, username }) => {
+  socket.on("joinRoom", ({ roomId, username, roomName }) => {
     socket.join(roomId);
 
     if (!rooms[roomId]) {
-      rooms[roomId] = { users: [], code: "" };
+      rooms[roomId] = { users: [], code: "", name: "" };
+    }
+
+    const name = typeof roomName === "string" ? roomName.trim() : "";
+    if (name && !rooms[roomId].name) {
+      rooms[roomId].name = name;
     }
 
     const existingUser = rooms[roomId].users.find(
@@ -40,11 +45,13 @@ io.on("connection", (socket) => {
     );
     if (!existingUser) {
       rooms[roomId].users.push({ socketId: socket.id, username });
-
       socket.to(roomId).emit("userJoined", username);
+    } else if (existingUser.username !== username) {
+      existingUser.username = username;
     }
 
     socket.emit("codeUpdate", rooms[roomId].code);
+    socket.emit("roomUpdate", { name: rooms[roomId].name });
     io.to(roomId).emit("userListUpdate", rooms[roomId].users);
   });
 

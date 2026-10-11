@@ -14,17 +14,25 @@ import {
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import socket from "../services/socket";
-import { getUsername } from "../services/username";
+import { getRoomName, getUsername } from "../services/username";
 import { CopyIcon } from "./icons";
 
 const SlideBar = ({ data }) => {
   const nav = useRouter();
   const { id: roomId } = useParams();
   const [username, setUsername] = useState("Anonymous");
+  const [roomName, setRoomName] = useState("");
   const toast = useToast();
 
   useEffect(() => {
     setUsername(getUsername());
+    setRoomName(getRoomName());
+  }, []);
+
+  useEffect(() => {
+    const onRoom = ({ name }) => setRoomName(name || getRoomName());
+    socket.on("roomUpdate", onRoom);
+    return () => socket.off("roomUpdate", onRoom);
   }, []);
 
   const copyRoomId = () => {
@@ -58,18 +66,15 @@ const SlideBar = ({ data }) => {
         <Text as="p" textStyle="monoEyebrow" color="mute" mb="xs">
           Room
         </Text>
-        <HStack justify="space-between" spacing="xs">
-          <Text
-            as="span"
-            fontFamily="mono"
-            fontSize="13px"
-            color="ink"
-            noOfLines={1}
-            title={roomId}
-          >
-            {roomId?.slice(0, 14)}…
-          </Text>
-        </HStack>
+        <Text
+          as="p"
+          textStyle="labelSm"
+          fontWeight="600"
+          color="ink"
+          noOfLines={1}
+        >
+          {roomName || "Untitled room"}
+        </Text>
         <Button
           variant="ghostSm"
           size="sm"

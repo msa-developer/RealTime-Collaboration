@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useRef, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import socket from "../services/socket";
-import { getUsername } from "../services/username";
+import { getRoomName, getUsername } from "../services/username";
 import { ArrowLeftIcon, PlayIcon } from "./icons";
 
 /* Monaco touches window — never render it on the server */
@@ -104,7 +104,13 @@ const CodingArea = ({ setUsers }) => {
   }, []);
 
   useEffect(() => {
-    socket.emit("joinRoom", { roomId, username });
+    /* Read name now — state ("Anonymous") not settled yet on mount,
+       and server keeps the first username it sees per socket. */
+    socket.emit("joinRoom", {
+      roomId,
+      username: getUsername(),
+      roomName: getRoomName(),
+    });
 
     socket.on("codeUpdate", (code) => {
       setCodeValue(code);
