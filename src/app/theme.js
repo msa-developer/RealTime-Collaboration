@@ -184,7 +184,8 @@ const theme = extendTheme({
             border: "1px solid",
             borderColor: "hairline",
             borderRadius: "sm",
-            fontSize: "14px",
+            /* 16px on mobile: below that iOS zooms into the field on focus */
+            fontSize: { base: "16px", md: "14px" },
             _placeholder: { color: "faint" },
             _hover: { borderColor: "#d4d4d4" },
             _focus: { borderColor: "link", boxShadow: "0 0 0 3px #d3e5ff", outline: "none" },

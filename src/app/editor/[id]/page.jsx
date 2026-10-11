@@ -10,7 +10,7 @@ const Collaborate = () => {
 
   return (
     <Flex
-      minH={{ base: "auto", md: "100dvh" }}
+      minH="100dvh"
       direction={{ base: "column", md: "row" }}
       bg="canvas"
     >

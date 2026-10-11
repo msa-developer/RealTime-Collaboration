@@ -305,12 +305,12 @@ const CodingArea = ({ setUsers }) => {
 
   return (
     <Box
-      flex="1"
+      flex={{ base: "none", md: 1 }}
       minW="0"
       bg="canvas"
       display="flex"
       flexDirection="column"
-      minH="100vh"
+      minH="0"
     >
       {/* App chrome bar */}
       <Flex
@@ -377,9 +377,14 @@ const CodingArea = ({ setUsers }) => {
       </Flex>
 
       {/* Editor card — toolbar, code surface, output console */}
-      <Box flex="1" p={{ base: "md", lg: "lg" }} minH="0" display="flex">
+      <Box
+        flex={{ base: "none", md: 1 }}
+        p={{ base: "md", lg: "lg" }}
+        minH="0"
+        display="flex"
+      >
         <Box
-          flex="1"
+          flex={{ base: "none", md: 1 }}
           minH="0"
           bg="elevated"
           border="1px solid"
@@ -443,8 +448,13 @@ const CodingArea = ({ setUsers }) => {
             </Button>
           </Flex>
 
-          {/* Code surface */}
-          <Box flex="1" minH="0">
+          {/* Code surface — fixed slice of viewport on mobile so the page
+              can scroll; flex-fill inside the desktop app shell */}
+          <Box
+            flex={{ base: "none", md: 1 }}
+            h={{ base: "50dvh", md: "auto" }}
+            minH="0"
+          >
             <Editor
               height="100%"
               theme="geist"
@@ -471,7 +481,7 @@ const CodingArea = ({ setUsers }) => {
           {/* Output console */}
           <Box
             flexShrink={0}
-            h={{ base: "150px", md: "200px" }}
+            h={{ base: "130px", md: "200px" }}
             bg="canvas"
             borderTop="1px solid"
             borderColor="hairline"
