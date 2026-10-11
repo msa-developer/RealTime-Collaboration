@@ -9,8 +9,14 @@ test("empty id stays idle", () => {
   assert.equal(c("", "Sprint", { exists: false, name: "" }), "idle");
 });
 
-test("checking (serverRoom null) stays idle", () => {
-  assert.equal(c("abc", "Sprint", null), "idle");
+test("checking (serverRoom null) with name offers create", () => {
+  // Ack never arrived (flaky mobile link): assume new room, don't dead-end on
+  // a disabled "Join room". A confirmed nameMismatch is the only real block.
+  assert.equal(c("abc", "Sprint", null), "create");
+});
+
+test("checking (serverRoom null) without name stays idle", () => {
+  assert.equal(c("abc", "  ", null), "idle");
 });
 
 test("unknown id with name offers create", () => {
