@@ -7,6 +7,8 @@ import {
   Button,
   Flex,
   HStack,
+  Icon,
+  IconButton,
   Text,
   VStack,
   useToast,
@@ -14,14 +16,16 @@ import {
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import socket from "../services/socket";
+import useVoice from "../services/useVoice";
 import { getRoomName, getUsername } from "../services/username";
-import { CopyIcon } from "./icons";
+import { CopyIcon, MicIcon, MicOffIcon } from "./icons";
 
 const SlideBar = ({ data }) => {
   const nav = useRouter();
   const { id: roomId } = useParams();
   const [username, setUsername] = useState("Anonymous");
   const [roomName, setRoomName] = useState("");
+  const { muted, toggle, error } = useVoice(roomId);
   const toast = useToast();
 
   useEffect(() => {
@@ -34,6 +38,12 @@ const SlideBar = ({ data }) => {
     socket.on("roomUpdate", onRoom);
     return () => socket.off("roomUpdate", onRoom);
   }, []);
+
+  useEffect(() => {
+    if (error) {
+      toast({ title: error, status: "error", duration: 5000, isClosable: true });
+    }
+  }, [error, toast]);
 
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId);
@@ -120,36 +130,64 @@ const SlideBar = ({ data }) => {
               You are alone in this room. Share the ID to invite others.
             </Text>
           ) : (
-            data.map((user) => (
-              <HStack
-                key={user.socketId}
-                spacing="sm"
-                p="xs"
-                rounded="sm"
-                border="1px solid"
-                borderColor="hairline"
-                bg="elevated"
-              >
-                <Avatar name={user.username} size="xs">
-                  <AvatarBadge boxSize="0.6em" bg="#0070f3" />
-                </Avatar>
-                <Text
-                  as="span"
-                  textStyle="labelSm"
-                  color="ink"
-                  noOfLines={1}
-                  flex="1"
+            data.map((user) => {
+              const isSelf = user.socketId === socket.id;
+              const isMuted = isSelf ? muted : user.muted !== false;
+              return (
+                <HStack
+                  key={user.socketId}
+                  spacing="sm"
+                  p="xs"
+                  rounded="sm"
+                  border="1px solid"
+                  borderColor="hairline"
+                  bg="elevated"
                 >
-                  {user.username}
-                  {user.username === username ? (
-                    <Text as="span" color="mute" fontWeight="400">
-                      {" "}
-                      (you)
-                    </Text>
-                  ) : null}
-                </Text>
-              </HStack>
-            ))
+                  <Avatar name={user.username} size="xs">
+                    <AvatarBadge boxSize="0.6em" bg="#0070f3" />
+                  </Avatar>
+                  <Text
+                    as="span"
+                    textStyle="labelSm"
+                    color="ink"
+                    noOfLines={1}
+                    flex="1"
+                  >
+                    {user.username}
+                    {isSelf ? (
+                      <Text as="span" color="mute" fontWeight="400">
+                        {" "}
+                        (you)
+                      </Text>
+                    ) : null}
+                  </Text>
+                  {isSelf ? (
+                    <IconButton
+                      aria-label={
+                        muted ? "Unmute microphone" : "Mute microphone"
+                      }
+                      title={muted ? "Unmute microphone" : "Mute microphone"}
+                      icon={muted ? <MicOffIcon /> : <MicIcon />}
+                      onClick={toggle}
+                      size="sm"
+                      variant="ghost"
+                      h="24px"
+                      w="24px"
+                      minW="24px"
+                      color={muted ? "faint" : "link"}
+                      borderRadius="sm"
+                      _hover={{ bg: "hairlineSoft" }}
+                    />
+                  ) : (
+                    <Icon
+                      as={isMuted ? MicOffIcon : MicIcon}
+                      color={isMuted ? "faint" : "link"}
+                      aria-label={isMuted ? "Muted" : "Unmuted"}
+                    />
+                  )}
+                </HStack>
+              );
+            })
           )}
         </VStack>
       </Flex>

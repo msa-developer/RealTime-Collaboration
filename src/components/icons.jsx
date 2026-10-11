@@ -48,3 +48,20 @@ export const ExternalLinkIcon = (props) => (
     <path d="M11 2h3v3" />
   </svg>
 );
+
+export const MicIcon = (props) => (
+  <svg {...svgProps} {...props}>
+    <rect x="6" y="2" width="4" height="7" rx="2" />
+    <path d="M3.75 7.25a4.25 4.25 0 0 0 8.5 0" />
+    <path d="M8 11.5V14" />
+  </svg>
+);
+
+export const MicOffIcon = (props) => (
+  <svg {...svgProps} {...props}>
+    <rect x="6" y="2" width="4" height="7" rx="2" />
+    <path d="M3.75 7.25a4.25 4.25 0 0 0 8.5 0" />
+    <path d="M8 11.5V14" />
+    <path d="M3 3l10 10" />
+  </svg>
+);

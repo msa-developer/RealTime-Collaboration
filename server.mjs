@@ -44,7 +44,11 @@ io.on("connection", (socket) => {
       (u) => u.socketId === socket.id,
     );
     if (!existingUser) {
-      rooms[roomId].users.push({ socketId: socket.id, username });
+      rooms[roomId].users.push({
+        socketId: socket.id,
+        username,
+        muted: true,
+      });
       socket.to(roomId).emit("userJoined", username);
     } else if (existingUser.username !== username) {
       existingUser.username = username;
@@ -66,6 +70,29 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("userListUpdate", rooms[roomId].users);
 
       socket.leave(roomId);
+    }
+  });
+
+  /* Voice chat: announce join so existing voice members send offers,
+     and relay WebRTC SDP/ICE between two specific sockets. */
+  socket.on("voice-join", ({ roomId }) => {
+    if (rooms[roomId]) {
+      socket.to(roomId).emit("voice-join", { from: socket.id });
+    }
+  });
+
+  socket.on("voice-signal", ({ roomId, to, data }) => {
+    if (rooms[roomId] && typeof to === "string" && data) {
+      io.to(to).emit("voice-signal", { from: socket.id, data });
+    }
+  });
+
+  socket.on("voiceMute", ({ roomId, muted }) => {
+    const room = rooms[roomId];
+    const user = room?.users.find((u) => u.socketId === socket.id);
+    if (user) {
+      user.muted = !!muted;
+      io.to(roomId).emit("userListUpdate", room.users);
     }
   });
 
