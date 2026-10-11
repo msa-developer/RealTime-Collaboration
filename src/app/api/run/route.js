@@ -13,15 +13,88 @@ const RUNTIMES = {
   java: { ext: "java" },
 };
 
-/* Friendly name when the binary is not on PATH (e.g. Render native
-   image without a JDK). Surfaces "Java is not installed..." instead of
-   raw "spawn javac ENOENT". */
-const MISSING = {
-  javac: "Java compiler (javac) is not installed on the server.",
-  java: "Java runtime (java) is not installed on the server.",
-  "g++": "C++ compiler (g++) is not installed on the server.",
-  python3: "Python (python3) is not installed on the server.",
+/* ponytail: local spawn first, Wandbox fallback when binary missing;
+   remote keeps Render native working with zero Dashboard change.
+   Piston public API went whitelist-only, Wandbox needs no key. */
+const WANDBOX = "https://wandbox.org/api/compile.json";
+const WANDBOX_LIST = "https://wandbox.org/api/list.json";
+
+let compilerCache = null;
+const resolveCompiler = async (language) => {
+  if (!compilerCache) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const res = await fetch(WANDBOX_LIST, { signal: ctrl.signal });
+      compilerCache = await res.json();
+    } catch {
+      compilerCache = [];
+    } finally {
+      clearTimeout(t);
+    }
+  }
+  if (language === "java") {
+    /* First Java entry; entry file is prog.java so caller must send
+       non-public class prog (see javaForWandbox below). */
+    return compilerCache.find((c) => c.language === "Java")?.name;
+  }
+  return (
+    compilerCache.find((c) => c.name === "gcc-head")?.name ||
+    compilerCache.find((c) => c.language === "C++")?.name
+  );
 };
+
+/* Wandbox compiles Java as prog.java — public class Main fails, so
+   rewrite any public class X to plain class prog. */
+const javaForWandbox = (src) => {
+  let s = src;
+  if (!/class\s+[A-Za-z_$][\w$]*/.test(s)) s = `public class Main {\n${s}\n}`;
+  if (/public\s+(?:(?:abstract|final)\s+)*class\s+[A-Za-z_$][\w$]*/.test(s)) {
+    return s.replace(
+      /public\s+(?:(?:abstract|final)\s+)*class\s+[A-Za-z_$][\w$]*/,
+      "class prog",
+    );
+  }
+  return s.replace(/(^|\n)\s*class\s+[A-Za-z_$][\w$]*/, "$1class prog");
+};
+
+const runViaWandbox = async (language, code) => {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  try {
+    const compiler = await resolveCompiler(language);
+    if (!compiler) throw new Error("no compiler listed");
+    const body =
+      language === "java"
+        ? { compiler, code: javaForWandbox(code), save: false }
+        : { compiler, code, save: false };
+    const res = await fetch(WANDBOX, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    const ok = data.status === "0";
+    return {
+      stdout: data.program_output || data.program_message || "",
+      stderr:
+        data.compiler_error || data.compiler_message || data.program_error || (ok ? "" : "Remote run failed."),
+      code: ok ? 0 : 1,
+    };
+  } catch (e) {
+    return {
+      stdout: "",
+      stderr: `Remote runner unavailable (${e.name === "AbortError" ? "timeout" : e.message}). Try again.`,
+      code: 1,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/* Local ENOENT (127) = binary absent on host. Fall back to remote. */
+const missingLocal = (r) => r && r.code === 127;
 
 const exec = (cmd, args, cwd) =>
   new Promise((resolve) => {
@@ -51,8 +124,7 @@ const exec = (cmd, args, cwd) =>
       clearTimeout(timer);
       const hint =
         e?.code === "ENOENT"
-          ? `${MISSING[cmd] || `Command "${cmd}" not found on the server.`} ` +
-            "Live service runs Render native image — Dashboard: Settings → Runtime → Docker, then Manual Deploy."
+          ? `Command "${cmd}" not found on server.`
           : e.message;
       resolve({ stdout, stderr: cap(stderr + hint), code: 127 });
     });
@@ -85,7 +157,11 @@ export async function POST(request) {
         [file, "-o", path.join(dir, "prog")],
         dir,
       );
-      if (build.code !== 0) return NextResponse.json(build);
+      if (build.code !== 0) {
+        if (missingLocal(build))
+          return NextResponse.json(await runViaWandbox("cpp", code));
+        return NextResponse.json(build);
+      }
       runCmd = path.join(dir, "prog");
       runArgs = [];
     } else if (language === "java") {
@@ -102,7 +178,11 @@ export async function POST(request) {
         )?.[1] || "Main";
       await writeFile(path.join(dir, `${cls}.java`), src);
       const build = await exec("javac", [`${cls}.java`], dir);
-      if (build.code !== 0) return NextResponse.json(build);
+      if (build.code !== 0) {
+        if (missingLocal(build))
+          return NextResponse.json(await runViaWandbox("java", code));
+        return NextResponse.json(build);
+      }
       runCmd = "java";
       runArgs = ["-cp", dir, cls];
     } else {
@@ -110,7 +190,17 @@ export async function POST(request) {
       [runCmd, runArgs] = rt.runner(file);
     }
 
-    return NextResponse.json(await exec(runCmd, runArgs, dir));
+    const out = await exec(runCmd, runArgs, dir);
+    if (missingLocal(out)) {
+      /* Local binary absent (Render native) — rerun remotely.
+         ponytail: remote covers compiled langs only; python/node
+         exist on Render native, so no fallback needed there. */
+      if (language === "java")
+        return NextResponse.json(await runViaWandbox("java", code));
+      if (language === "cpp")
+        return NextResponse.json(await runViaWandbox("cpp", code));
+    }
+    return NextResponse.json(out);
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   } finally {
