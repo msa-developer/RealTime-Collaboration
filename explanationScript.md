@@ -7,7 +7,7 @@
 > **\"Hello! Today I'll walk you through my Real-Time Collaborative Code Editor - a modern web application that allows multiple developers to code together in real-time, just like Google Docs but for programming!\"**
 
 ### 🔗 **Live Demo**
-**Website**: [https://collaboration-gwsu.onrender.com](https://collaboration-gwsu.onrender.com)
+**Website**: [https://real-time-collaboration-dusky.vercel.app](https://real-time-collaboration-dusky.vercel.app)
 
 ---
 
@@ -269,4 +269,4 @@ npm run build
 
 *Built with ❤️ using React, Node.js, and Socket.io*
 
-**🔗 Try it yourself: [https://collaboration-gwsu.onrender.com](https://collaboration-gwsu.onrender.com)**"
+**🔗 Try it yourself: [https://real-time-collaboration-dusky.vercel.app](https://real-time-collaboration-dusky.vercel.app)**"

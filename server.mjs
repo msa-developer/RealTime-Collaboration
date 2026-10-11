@@ -1,21 +1,11 @@
 import { createServer } from "http";
 import next from "next";
 import { Server } from "socket.io";
-import cron from "node-cron";
 import { wipeEmptyRoom } from "./src/services/roomWipe.js";
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
 const handle = app.getRequestHandler();
-
-/* Keep-alive ping (was Backend/src/cronJobs.js) */
-cron.schedule("*/15 * * * *", async () => {
-  try {
-    await fetch("https://collaboration-gwsu.onrender.com/");
-  } catch (error) {
-    console.log(error.message);
-  }
-});
 
 await app.prepare();
 
