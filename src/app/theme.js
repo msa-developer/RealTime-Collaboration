@@ -135,8 +135,8 @@ const theme = extendTheme({
           fontSize: "16px",
           px: "14px",
           h: "44px",
-          _hover: { bg: "hairlineSoft", borderColor: "#d4d4d4" },
-          _active: { bg: "hairline" },
+          _hover: { bg: "hairline", borderColor: "#d4d4d4" },
+          _active: { bg: "#e0e0e0" },
         },
         /* App / nav chrome — 6px square */
         primarySm: {

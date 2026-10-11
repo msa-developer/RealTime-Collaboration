@@ -115,8 +115,12 @@ const HomePage = () => {
             radial-gradient(36% 44% at 84% 26%, rgba(255,0,128,0.24), transparent 70%),
             radial-gradient(34% 42% at 55% 58%, rgba(249,203,40,0.28), transparent 70%)"
           filter="blur(40px)"
-          maskImage="radial-gradient(120% 100% at 50% 20%, black 30%, transparent 100%)"
-          WebkitMaskImage="radial-gradient(120% 100% at 50% 20%, black 30%, transparent 100%)"
+          sx={{
+            maskImage:
+              "radial-gradient(120% 100% at 50% 20%, black 30%, transparent 100%)",
+            WebkitMaskImage:
+              "radial-gradient(120% 100% at 50% 20%, black 30%, transparent 100%)",
+          }}
         />
         <VStack
           position="relative"
