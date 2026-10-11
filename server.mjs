@@ -2,6 +2,7 @@ import { createServer } from "http";
 import next from "next";
 import { Server } from "socket.io";
 import cron from "node-cron";
+import { wipeEmptyRoom } from "./src/services/roomWipe.js";
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
@@ -70,19 +71,8 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("userListUpdate", rooms[roomId].users);
   });
 
-  socket.on("leaveRoom", ({ roomId, username }) => {
-    const user = rooms[roomId]?.users.find((u) => u.socketId === socket.id);
-    if (user) {
-      rooms[roomId].users = rooms[roomId].users.filter(
-        (u) => u.socketId !== socket.id,
-      );
-
-      socket.to(roomId).emit("userLeft", username);
-      io.to(roomId).emit("userListUpdate", rooms[roomId].users);
-      leaveVoice(socket, roomId);
-
-      socket.leave(roomId);
-    }
+  socket.on("leaveRoom", ({ roomId }) => {
+    removeFromRoom(socket, roomId);
   });
 
   /* Voice chat: the server owns the per-room voice roster. Only the newcomer
@@ -107,6 +97,22 @@ io.on("connection", (socket) => {
   const leaveVoice = (socket, roomId) => {
     const roster = voice[roomId];
     if (roster?.delete(socket.id) && !roster.size) delete voice[roomId];
+  };
+
+  /* Single choke point for leaving: notify the room, then wipe it entirely when
+     the last user goes, so no roomId, name, or code is retained. */
+  const removeFromRoom = (socket, roomId) => {
+    const room = rooms[roomId];
+    const user = room?.users.find((u) => u.socketId === socket.id);
+    if (!user) return;
+
+    room.users = room.users.filter((u) => u.socketId !== socket.id);
+    socket.to(roomId).emit("userLeft", user.username);
+    io.to(roomId).emit("userListUpdate", room.users);
+    leaveVoice(socket, roomId);
+    socket.leave(roomId);
+
+    wipeEmptyRoom(rooms, roomId);
   };
 
   socket.on("voiceMute", ({ roomId, muted }) => {
@@ -146,16 +152,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    for (let roomId in rooms) {
-      const user = rooms[roomId].users.find((u) => u.socketId === socket.id);
-      if (user) {
-        rooms[roomId].users = rooms[roomId].users.filter(
-          (u) => u.socketId !== socket.id,
-        );
-
-        socket.to(roomId).emit("userLeft", user.username);
-        io.to(roomId).emit("userListUpdate", rooms[roomId].users);
-        leaveVoice(socket, roomId);
+    for (const roomId in rooms) {
+      if (rooms[roomId].users.some((u) => u.socketId === socket.id)) {
+        removeFromRoom(socket, roomId);
         break;
       }
     }
