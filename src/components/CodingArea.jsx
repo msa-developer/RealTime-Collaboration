@@ -401,6 +401,8 @@ const CodingArea = ({ setUsers }) => {
       >
         <Box
           flex={{ base: "none", md: 1 }}
+          w="full"
+          minW="0"
           minH="0"
           bg="elevated"
           border="1px solid"
