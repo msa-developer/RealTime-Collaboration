@@ -98,6 +98,7 @@ const CodingArea = ({ setUsers }) => {
   const [running, setRunning] = useState(false);
   const runningRef = useRef(false);
   const [output, setOutput] = useState(null);
+  const [runBy, setRunBy] = useState("");
 
   useEffect(() => {
     setUsername(getUsername());
@@ -114,6 +115,12 @@ const CodingArea = ({ setUsers }) => {
 
     socket.on("codeUpdate", (code) => {
       setCodeValue(code);
+    });
+
+    socket.on("runUpdate", ({ running, output, by }) => {
+      setRunning(Boolean(running));
+      setOutput(output || null);
+      setRunBy(by || "");
     });
 
     socket.on("userListUpdate", (users) => {
@@ -163,6 +170,7 @@ const CodingArea = ({ setUsers }) => {
 
     return () => {
       socket.off("codeUpdate");
+      socket.off("runUpdate");
       socket.off("userListUpdate");
       socket.off("userJoined");
       socket.off("userLeft");
@@ -199,6 +207,8 @@ const CodingArea = ({ setUsers }) => {
     runningRef.current = true;
     setRunning(true);
     setOutput(null);
+    setRunBy("");
+    socket.emit("runUpdate", { roomId, running: true, output: null });
     try {
       const res = await fetch("/api/run", {
         method: "POST",
@@ -206,16 +216,22 @@ const CodingArea = ({ setUsers }) => {
         body: JSON.stringify({ language, code: codeValue }),
       });
       const data = await res.json();
-      setOutput(
-        res.ok
+      socket.emit("runUpdate", {
+        roomId,
+        running: false,
+        output: res.ok
           ? data
           : { stdout: "", stderr: data.error || "Run failed.", code: 1 },
-      );
+      });
     } catch {
-      setOutput({
-        stdout: "",
-        stderr: "Cannot reach the run service. Is the backend running?",
-        code: 1,
+      socket.emit("runUpdate", {
+        roomId,
+        running: false,
+        output: {
+          stdout: "",
+          stderr: "Cannot reach the run service. Is the backend running?",
+          code: 1,
+        },
       });
     } finally {
       runningRef.current = false;
@@ -498,9 +514,16 @@ const CodingArea = ({ setUsers }) => {
               borderColor="hairline"
               flexShrink={0}
             >
-              <Text as="p" textStyle="monoEyebrow" color="mute">
-                Output
-              </Text>
+              <HStack spacing="xxs">
+                <Text as="p" textStyle="monoEyebrow" color="mute">
+                  Output
+                </Text>
+                {runBy && (
+                  <Text as="p" textStyle="monoEyebrow" color="faint">
+                    · {runBy}
+                  </Text>
+                )}
+              </HStack>
               <Text
                 as="p"
                 textStyle="monoEyebrow"

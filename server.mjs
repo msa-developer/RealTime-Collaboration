@@ -111,6 +111,18 @@ io.on("connection", (socket) => {
     }
   });
 
+  /* Run output belongs to the room, not the clicker: relay to everyone. */
+  socket.on("runUpdate", ({ roomId, running, output }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    const user = room.users.find((u) => u.socketId === socket.id);
+    io.to(roomId).emit("runUpdate", {
+      running,
+      output,
+      by: user?.username || "",
+    });
+  });
+
   socket.on("userTyping", ({ roomId, username }) => {
     socket.to(roomId).emit("userTyping", username);
   });
