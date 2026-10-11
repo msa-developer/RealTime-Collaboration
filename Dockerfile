@@ -12,6 +12,9 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-ENV NODE_ENV=production PORT=5001
-EXPOSE 5001
+# Render injects PORT=10000; server.mjs already reads process.env.PORT.
+# EXPOSE is documentation only; CMD must stay a long-running server.
+ENV NODE_ENV=production
+EXPOSE 10000
 CMD ["npm", "start"]
+
