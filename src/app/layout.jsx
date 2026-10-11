@@ -6,6 +6,12 @@ export const metadata = {
     "Create a room, share the ID, and write code together in real time. Live cursor sync, multi-language runs, zero setup.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">

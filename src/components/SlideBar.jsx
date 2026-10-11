@@ -64,16 +64,23 @@ const SlideBar = ({ data }) => {
       borderRight={{ base: "none", md: "1px solid" }}
       borderBottom={{ base: "1px solid", md: "none" }}
       borderColor="hairline"
-      px={{ base: "md", md: "lg" }}
-      py={{ base: "sm", md: "lg" }}
+      px={{ base: "sm", md: "lg" }}
+      py={{ base: "xs", md: "lg" }}
       display="flex"
-      flexDirection="column"
-      gap="md"
+      flexDirection={{ base: "row", md: "column" }}
+      alignItems={{ base: "center", md: "stretch" }}
+      gap={{ base: "sm", md: "md" }}
       maxH={{ base: "none", md: "100dvh" }}
     >
-      {/* Room identity */}
-      <Box>
-        <Text as="p" textStyle="monoEyebrow" color="mute" mb="xs">
+      {/* Room identity — eyebrow + copy button belong to the desktop column only */}
+      <Box flex={{ base: 1, md: "none" }} minW={0}>
+        <Text
+          as="p"
+          textStyle="monoEyebrow"
+          color="mute"
+          mb="xs"
+          display={{ base: "none", md: "block" }}
+        >
           Room
         </Text>
         <Text
@@ -92,13 +99,19 @@ const SlideBar = ({ data }) => {
           mt="sm"
           leftIcon={<CopyIcon />}
           onClick={copyRoomId}
+          display={{ base: "none", md: "flex" }}
         >
           Copy room ID
         </Button>
       </Box>
 
-      {/* Connected users */}
-      <Flex direction="column" minH="0" flex="1">
+      {/* Connected users — desktop column */}
+      <Flex
+        direction="column"
+        minH="0"
+        flex="1"
+        display={{ base: "none", md: "flex" }}
+      >
         <HStack justify="space-between" mb="xs">
           <Text as="p" textStyle="monoEyebrow" color="mute">
             Connected
@@ -192,7 +205,51 @@ const SlideBar = ({ data }) => {
         </VStack>
       </Flex>
 
-      <Button variant="dangerSm" w="full" onClick={leaveRoom}>
+      {/* Mobile bar: presence + actions in one thumb-reach row */}
+      <HStack spacing="xs" flexShrink={0} display={{ base: "flex", md: "none" }}>
+        <HStack spacing={-1}>
+          {data.slice(0, 4).map((user) => (
+            <Avatar
+              key={user.socketId}
+              name={user.username}
+              size="xs"
+              border="2px solid"
+              borderColor="canvas"
+            />
+          ))}
+        </HStack>
+        <Text
+          as="span"
+          fontFamily="mono"
+          fontSize="12px"
+          color="ink"
+          bg="hairlineSoft"
+          border="1px solid"
+          borderColor="hairline"
+          rounded="pill"
+          px="xs"
+        >
+          {data.length}
+        </Text>
+        <IconButton
+          aria-label="Copy room ID"
+          title="Copy room ID"
+          icon={<CopyIcon />}
+          onClick={copyRoomId}
+          size="sm"
+          variant="ghostSm"
+        />
+        <Button variant="dangerSm" size="sm" onClick={leaveRoom}>
+          Leave
+        </Button>
+      </HStack>
+
+      <Button
+        variant="dangerSm"
+        w="full"
+        onClick={leaveRoom}
+        display={{ base: "none", md: "flex" }}
+      >
         Leave room
       </Button>
     </Box>
